@@ -1,34 +1,133 @@
-import { useState } from 'react';
-import reactLogo from './assets/react.svg';
-import viteLogo from '/vite.svg';
+import { useState, useEffect } from 'react';
 import './App.css';
+import CatList from './components/CatList';
+import axios from 'axios';
+
+const kbaseURL = 'http://localhost:5000';
+
+const convertFromApi = (apiCat) => {
+  const newCat = {
+    ...apiCat,
+    caretaker: apiCat.caretaker ? apiCat.caretaker : 'Unknown',
+    petCount: apiCat.pet_count
+  };
+
+  delete newCat.pet_count;
+  return newCat;
+};
+
+const getAllCatsApi = () => {
+  return axios.get(`${kbaseURL}/cats`)
+    .then( response => {
+      const apiCats = response.data;
+      const newCats = apiCats.map(convertFromApi);
+      return newCats;
+    })
+    .catch(error => {
+      console.log(error);
+    });
+};
+
+
+const petCatApi = (id) => {
+  return axios.patch(`${kbaseURL}/cats/${id}/pet`)
+    .then( response => {
+      const newCat = convertFromApi(response.data);
+      return newCat;
+    })
+    .catch( error => {
+      console.log(error);
+    });
+};
+
+const unregisterCatApi = (id) => {
+  return axios.delete(`${kbaseURL}/cats/${id}`)
+    .catch(error => {
+      console.log(error);
+    });
+};
+
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [catData, setCatData] = useState([]);
+
+  const getAllCats = () => {
+    getAllCatsApi()
+      .then(cats => {
+        setCatData(cats);
+      });
+  };
+
+  useEffect(() => {
+    getAllCats();
+  }, []);
+
+  const handlePetCat = (id) => {
+    // console.log(`we pet ${id} cat`);
+    // update the cat
+    petCatApi(id)
+      .then((apiCat) => {
+        setCatData(catData => catData.map(cat => {
+          if (cat.id === id) {
+            // update pet count
+            return apiCat;
+          } else {
+            // no change to this cat
+            return cat;
+          }
+        }));
+      });
+
+    // const newCatData = catData.map(cat => {
+    //   if (cat.id === id) {
+    //     // update pet count
+    //     return { ...cat, petCount: cat.petCount + 1 };
+    //   } else {
+    //     // no change to this cat
+    //     return cat;
+    //   }
+    // });
+    // setCatData(newCatData);
+  };
+
+  const handleUnregisterCat = (id) => {
+    unregisterCatApi(id)
+      .then(() => {
+        setCatData(catData => catData.filter(cat => {
+          return cat.id !== id;
+        }));
+      });
+  };
+
+  // const calculateTotalPetCount = (catData) => {
+  //   let total = 0;
+  //   for (const cat of catData) {
+  //     total += cat.petCount;
+  //   }
+  //   return total;
+  // };
+
+  const calculateTotalPetCount = (catData) => {
+    return catData.reduce((total, cat) => {
+      return total + cat.petCount;
+    }, 0);
+  };
+
+  const totalPets = calculateTotalPetCount(catData);
 
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank" rel="noreferrer">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noreferrer">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <main>
+        <h1> The Cat Corral </h1>
+        <h2>Total Number of Pets Across All Cats: {totalPets}</h2>
+        <CatList
+          catData={catData}
+          onPetCat={handlePetCat}
+          onUnregisterCat={handleUnregisterCat}
+        />
+      </main>
     </>
+
   );
 }
 
